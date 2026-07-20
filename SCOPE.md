@@ -1,4 +1,4 @@
-# tf-mod-aws-detective — SCOPE
+# terraform-aws-detective — SCOPE
 
 Composite module for Amazon Detective: the behavior graph, member-account invitations, the
 invitation accepter (member-side), and AWS Organizations delegated-administrator / org-wide
@@ -32,28 +32,28 @@ Referenced by id/ARN/account-id, never created here:
 
 - **Amazon GuardDuty** — GuardDuty findings, VPC Flow Logs, and DNS logs are Detective's primary
   data sources. Detective ingests them automatically once enabled; this module does **not** enable
-  or configure GuardDuty. **`tf-mod-aws-guardduty` should typically be enabled first** — Detective
+  or configure GuardDuty. **`terraform-aws-guardduty` should typically be enabled first** — Detective
   without GuardDuty still ingests VPC Flow Logs/DNS/CloudTrail-derived data, but the investigative
   value is materially lower without GuardDuty findings to pivot from.
 - **AWS Organizations itself** — `aws_organizations_organization` / `aws_organizations_account` /
   the `aws_service_access_principals` trusted-access toggle for `detective.amazonaws.com` live in
-  `tf-mod-aws-organizations` (Phase 7) or the root module. This module assumes an Organization
+  `terraform-aws-organizations` (Phase 7) or the root module. This module assumes an Organization
   already exists and Detective trusted access is already enabled when the organization
   admin-account / org-configuration resources are used.
 - **Member AWS accounts** — referenced by 12-digit account ID / email; not created here.
 - **Security Hub integration** — Detective findings surfaced in Security Hub are configured in
-  `tf-mod-aws-security-hub`, not here.
+  `terraform-aws-security-hub`, not here.
 
 ## Consumes
 
 | Input | Type | Source module |
 |---|---|---|
 | `graph_arn` (when `create_graph = false`) | `string` (Detective graph ARN) | Another invocation of this same module (administrator account's `arn`/`graph_arn` output) |
-| `organization_admin_account_id` | `string` (12-digit account id) | Caller-supplied, or `data.aws_organizations_organization` / `data.aws_caller_identity` in the root module — **not** a `tf-mod-aws-organizations` output today (Phase 7, not yet built), matching the `tf-mod-aws-inspector2` precedent |
+| `organization_admin_account_id` | `string` (12-digit account id) | Caller-supplied, or `data.aws_organizations_organization` / `data.aws_caller_identity` in the root module — **not** a `terraform-aws-organizations` output today (Phase 7, not yet built), matching the `terraform-aws-inspector2` precedent |
 | `members[*].account_id` | `string` (12-digit account id) | Caller-supplied member/child account ids |
 
 > **Foundation-adjacent module** — Detective consumes GuardDuty's *output* (findings) implicitly at
-> the data-plane level, but has no Terraform-level dependency on `tf-mod-aws-guardduty`; the two
+> the data-plane level, but has no Terraform-level dependency on `terraform-aws-guardduty`; the two
 > modules are ordered by operational recommendation, not by a `depends_on` / input wiring.
 
 ## Required IAM permissions
@@ -77,7 +77,7 @@ No `iam:PassRole` required by this module.
 
 - **Amazon Detective works best with GuardDuty already enabled.** Detective ingests GuardDuty
   findings, VPC Flow Logs, and DNS query logs as its primary evidence sources. Enable
-  `tf-mod-aws-guardduty` in the same account/Region before (or alongside) this module for the
+  `terraform-aws-guardduty` in the same account/Region before (or alongside) this module for the
   investigation graph to be materially useful — Detective will still enable and ingest VPC
   Flow/DNS data without GuardDuty, but with a narrower analytical surface.
 - **One behavior graph per account per Region.** Creating a second `aws_detective_graph` in the
@@ -93,7 +93,7 @@ No `iam:PassRole` required by this module.
 - **Detective trusted access for AWS Organizations** (`aws_service_access_principals` including
   `detective.amazonaws.com`) must already be enabled on the Organization before
   `aws_detective_organization_admin_account` succeeds — a one-time Organizations-level action
-  typically performed in the root module or via `tf-mod-aws-organizations`, outside this module's
+  typically performed in the root module or via `terraform-aws-organizations`, outside this module's
   control.
 - **No service-linked role** is documented as required for Detective itself.
 - **Quotas** (Region-specific; see the Detective User Guide):
@@ -114,7 +114,7 @@ No `iam:PassRole` required by this module.
 | `created_time` | Graph creation timestamp, or `null` when `create_graph = false` | Audit |
 | `tags_all` | All tags incl. provider `default_tags` (on the graph only) — `null` when `create_graph = false` | Governance/audit |
 | `member_ids` / `member_statuses` / `member_administrator_ids` / `member_volume_usage_bytes` | Maps of member label → id / status / administrator account id / daily ingest volume | Org rollup, membership health monitoring |
-| `organization_admin_account_id` | Registered delegated administrator account id, or `null` | Audit; cross-check against `tf-mod-aws-guardduty` / `tf-mod-aws-security-hub` delegated admin |
+| `organization_admin_account_id` | Registered delegated administrator account id, or `null` | Audit; cross-check against `terraform-aws-guardduty` / `terraform-aws-security-hub` delegated admin |
 | `organization_configuration_id` / `organization_auto_enable` | Org configuration state, or `null` | Compliance reporting |
 | `invitation_accepter_id` | Accepter id, or `null` when `accept_invitation = false` | Audit/state inspection |
 
@@ -171,7 +171,7 @@ No `iam:PassRole` required by this module.
 ## Design decisions
 
 - **The keystone graph is itself toggleable (`create_graph`, default `true`).** This mirrors
-  `tf-mod-aws-inspector2`'s "individually toggleable switches" philosophy: a member-account
+  `terraform-aws-inspector2`'s "individually toggleable switches" philosophy: a member-account
   invocation (`accept_invitation = true`) does not need to force-create its own graph, since
   Detective member accounts do not own a graph — they attach to the administrator's. Because of
   this, the graph is rendered with a guarded `for_each` keyed `"this"`, and every graph-derived
@@ -181,13 +181,13 @@ No `iam:PassRole` required by this module.
   `organization_configuration`, `invitation_accepter`) references a single local value regardless
   of whether this call owns the graph or attaches to an external one via `var.graph_arn`.
 - **GuardDuty is deliberately out of scope** — it is a sibling module
-  (`tf-mod-aws-guardduty`) that Detective consumes at the data-plane level (not via Terraform
+  (`terraform-aws-guardduty`) that Detective consumes at the data-plane level (not via Terraform
   wiring). Building/enabling it first is documented as an operational recommendation, not enforced
   as a hard Terraform dependency, since Detective can be enabled (with reduced value) without it.
-- **AWS Organizations itself is deliberately excluded**, consistent with `tf-mod-aws-inspector2`
-  and `tf-mod-aws-guardduty`: this module accepts raw account-id strings for
+- **AWS Organizations itself is deliberately excluded**, consistent with `terraform-aws-inspector2`
+  and `terraform-aws-guardduty`: this module accepts raw account-id strings for
   `organization_admin_account_id` and `members[*].account_id` rather than blocking on the Phase 7
-  `tf-mod-aws-organizations` module.
+  `terraform-aws-organizations` module.
 - **The organization admin-account and org-configuration resources are individually toggleable**
   (`enable_organization_admin_account` / `organization_configuration != null`) rather than bundled,
   because they must be applied from two different accounts (management vs. delegated

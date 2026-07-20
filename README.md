@@ -14,13 +14,13 @@
 
 - 🕵️ **Investigation graph, fully wired.** Creates `aws_detective_graph` (the keystone) plus everything meaningless without it: member-account invitations, the cross-account invitation accepter, and AWS Organizations delegated-admin / org-wide auto-enrollment.
 - 🔀 **Two invocation shapes, one module.** Invoke with `create_graph = true` from the account that will **own** the graph (administrator), or `create_graph = false` from a **member account's own provider context** purely to accept an invitation and/or read organization state against an externally-supplied `graph_arn`.
-- 🔗 **Correct ordering, automatically.** `organization_admin_account` is sequenced before `organization_configuration` via `depends_on` (no direct attribute reference exists between them, since they typically run from different accounts) — mirroring the pattern in `tf-mod-aws-inspector2`.
+- 🔗 **Correct ordering, automatically.** `organization_admin_account` is sequenced before `organization_configuration` via `depends_on` (no direct attribute reference exists between them, since they typically run from different accounts) — mirroring the pattern in `terraform-aws-inspector2`.
 - 🏢 **Org-wide delegated administrator — same shape as GuardDuty / Security Hub.** One designated admin account manages the org's Detective behavior graph and can auto-enroll new accounts as they join.
 - 🤝 **A member must ACCEPT before it's fully part of the graph.** `aws_detective_member` only sends the invitation from the administrator account; `aws_detective_invitation_accepter` — run in the **member's own provider context** — completes the join, mirroring the cross-account accepter pattern used elsewhere in this library (e.g. GuardDuty's invite accepter).
 - 🏷️ **Tags where they're accepted.** `var.tags` flows to the **only** taggable Detective resource — the graph — and merges with provider `default_tags`; members, the accepter, and both organization resources are **not** taggable.
 - 🧮 **Members as data.** `members` is a `map(object(...))` collection rendered with `for_each`, keyed by a stable caller string.
 
-> 💡 **Why it matters:** GuardDuty tells you *something* happened; Detective helps you figure out *what actually happened* — it automatically organizes findings, VPC flow logs, and DNS/API activity into a graph an investigator can pivot through in seconds instead of stitching together CloudTrail queries by hand. For an FI under regulatory oversight handling PII, that shortens the single most expensive phase of an incident — root-cause investigation — from days to minutes, and doing it consistently across every account starts with `tf-mod-aws-guardduty` enabled first.
+> 💡 **Why it matters:** GuardDuty tells you *something* happened; Detective helps you figure out *what actually happened* — it automatically organizes findings, VPC flow logs, and DNS/API activity into a graph an investigator can pivot through in seconds instead of stitching together CloudTrail queries by hand. For an FI under regulatory oversight handling PII, that shortens the single most expensive phase of an incident — root-cause investigation — from days to minutes, and doing it consistently across every account starts with `terraform-aws-guardduty` enabled first.
 
 ---
 
@@ -38,15 +38,15 @@ Whether it's a star, a professional connection, or a coffee, every gesture helps
 
 ## 🗺️ Where this fits in the family
 
-`tf-mod-aws-detective` is a **security investigation consumer** — it sits downstream of GuardDuty's findings and upstream of aggregation/response, and shares its delegated-administrator wiring with AWS Organizations.
+`terraform-aws-detective` is a **security investigation consumer** — it sits downstream of GuardDuty's findings and upstream of aggregation/response, and shares its delegated-administrator wiring with AWS Organizations.
 
 ```mermaid
 flowchart LR
- gd["tf-mod-aws-guardduty<br/>threat findings source"]
- det["tf-mod-aws-detective"]
- hub["tf-mod-aws-security-hub<br/>findings aggregation"]
- org["tf-mod-aws-organizations<br/>delegated admin / accounts"]
- eb["tf-mod-aws-eventbridge<br/>investigation-driven response"]
+ gd["terraform-aws-guardduty<br/>threat findings source"]
+ det["terraform-aws-detective"]
+ hub["terraform-aws-security-hub<br/>findings aggregation"]
+ org["terraform-aws-organizations<br/>delegated admin / accounts"]
+ eb["terraform-aws-eventbridge<br/>investigation-driven response"]
 
  gd -.->|"findings feed investigation graph"| det
  org -->|"organization_admin_account_id / member account ids"| det
@@ -56,7 +56,7 @@ flowchart LR
  style det fill:#FF9900,color:#fff,stroke:#cc7a00,stroke-width:2px
 ```
 
-> ⚠️ **Enable GuardDuty first.** Detective ingests GuardDuty findings, VPC Flow Logs, and DNS query logs as its primary evidence sources. It will still enable and analyze flow/DNS data without GuardDuty, but the investigative payoff is materially smaller — `tf-mod-aws-guardduty` is not a Terraform-level dependency of this module, but it is the operationally recommended prerequisite.
+> ⚠️ **Enable GuardDuty first.** Detective ingests GuardDuty findings, VPC Flow Logs, and DNS query logs as its primary evidence sources. It will still enable and analyze flow/DNS data without GuardDuty, but the investigative payoff is materially smaller — `terraform-aws-guardduty` is not a Terraform-level dependency of this module, but it is the operationally recommended prerequisite.
 
 ---
 
@@ -64,7 +64,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
- subgraph mod["tf-mod-aws-detective"]
+ subgraph mod["terraform-aws-detective"]
  keystone["aws_detective_graph.this<br/>(keystone, guarded for_each)<br/>toggled by create_graph"]
  mem["aws_detective_member.this<br/>for_each members"]
  oaa["aws_detective_organization_admin_account.this<br/>guarded for_each"]
@@ -128,7 +128,7 @@ Least-privilege actions the **Terraform execution identity** needs to manage thi
 - **Enable GuardDuty first (strongly recommended).** Detective's evidence sources are GuardDuty findings, VPC Flow Logs, and DNS query logs — the graph works without GuardDuty but is materially less useful.
 - **One behavior graph per account per Region (hard limit).** Instantiating this module twice with `create_graph = true` in the same account+Region fails on the second graph. Use provider aliases (one module instance per Region).
 - **Organization-wide delegated administrator — mirrors GuardDuty/Security Hub exactly.** One designated Detective delegated administrator account manages the org's graph and can auto-enroll new accounts; register it via `enable_organization_admin_account` from the **management** account before applying `organization_configuration` from the **delegated administrator** account.
-- **Detective trusted access for AWS Organizations** (`aws_service_access_principals` including `detective.amazonaws.com`) must already be enabled on the Organization before `aws_detective_organization_admin_account` succeeds — a one-time Organizations-level action, typically performed in the root module or via `tf-mod-aws-organizations`, outside this module's control.
+- **Detective trusted access for AWS Organizations** (`aws_service_access_principals` including `detective.amazonaws.com`) must already be enabled on the Organization before `aws_detective_organization_admin_account` succeeds — a one-time Organizations-level action, typically performed in the root module or via `terraform-aws-organizations`, outside this module's control.
 - **No service-linked role** is documented as required for Detective itself.
 - **Quotas** (Region-specific; see the [Detective User Guide](https://docs.aws.amazon.com/detective/latest/adminguide/detective-quotas.html)):
  - **1 behavior graph** per account per Region.
@@ -140,7 +140,7 @@ Least-privilege actions the **Terraform execution identity** needs to manage thi
 ## 📁 Module Structure
 
 ```
-tf-mod-aws-detective/
+terraform-aws-detective/
 ├── providers.tf # required_providers (aws >= 6.0, < 7.0); no provider block
 ├── variables.tf # create_graph → graph_arn → members → org admin account → org configuration → accept_invitation → tags → timeouts
 ├── main.tf # graph (this, guarded) → members / org admin account / org configuration / invitation accepter
@@ -157,7 +157,7 @@ Smallest secure call — standalone graph, no members, no org wiring:
 
 ```hcl
 module "detective" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 
   # create_graph = true (default) — a standalone behavior graph in this account+Region.
 
@@ -190,7 +190,7 @@ module "detective" {
 | `created_time` | Graph creation timestamp, or `null` | Audit |
 | `tags_all` | All tags incl. provider `default_tags` on the graph, or `null` | Governance/audit |
 | `member_ids` / `member_statuses` / `member_administrator_ids` / `member_volume_usage_bytes` | Maps of member label → id / status / administrator account id / daily ingest volume | Org rollup, membership health monitoring |
-| `organization_admin_account_id` | Registered delegated administrator account id, or `null` | Audit; cross-check against `tf-mod-aws-guardduty` / `tf-mod-aws-security-hub` delegated admin |
+| `organization_admin_account_id` | Registered delegated administrator account id, or `null` | Audit; cross-check against `terraform-aws-guardduty` / `terraform-aws-security-hub` delegated admin |
 | `organization_configuration_id` / `organization_auto_enable` | Org configuration state, or `null` | Compliance reporting |
 | `invitation_accepter_id` | Accepter id, or `null` when `accept_invitation = false` | Audit/state inspection |
 
@@ -203,7 +203,7 @@ module "detective" {
 
 ```hcl
 module "detective" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 
   # create_graph = true — all defaults.
 }
@@ -220,7 +220,7 @@ provider "aws" {
 }
 
 module "detective" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 
   tags = {
     Environment = "prod" # resource tag — wins over default_tags on key conflict
@@ -237,7 +237,7 @@ module "detective" {
 
 ```hcl
 module "detective" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 
   members = {
     audit = {
@@ -266,7 +266,7 @@ provider "aws" {
 }
 
 module "detective_member" {
-  source    = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source    = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
   providers = { aws = aws.member }
 
   create_graph      = false # this account does not own a graph
@@ -281,7 +281,7 @@ module "detective_member" {
 
 ```hcl
 module "detective_admin" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 
   create_graph                      = false # the management account does not own the org's graph
   enable_organization_admin_account = true
@@ -300,7 +300,7 @@ provider "aws" {
 }
 
 module "detective_delegated_admin" {
-  source    = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source    = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
   providers = { aws = aws.delegated_admin }
 
   # create_graph = true — the delegated administrator owns the org's graph.
@@ -318,7 +318,7 @@ module "detective_delegated_admin" {
 
 ```hcl
 module "detective" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 
   # organization_configuration left null (default) — every account is invited
   # explicitly and individually via `members`, keeping Terraform as the single
@@ -336,7 +336,7 @@ module "detective" {
 
 ```hcl
 module "detective" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 
   members = {
     sandbox = {
@@ -362,7 +362,7 @@ locals {
 }
 
 module "detective" {
-  source  = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source  = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
   members = local.business_unit_accounts
 }
 ```
@@ -373,7 +373,7 @@ module "detective" {
 
 ```hcl
 module "detective_members_only" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 
   create_graph = false
   graph_arn    = "arn:aws:detective:us-east-1:123456789101:graph:231684d34gh74g4bae1dbc7bd807d02d"
@@ -395,7 +395,7 @@ import {
 }
 
 module "detective" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 }
 ```
 </details>
@@ -411,11 +411,11 @@ provider "aws" { alias = "west"
 }
 
 module "detective_use1" {
- source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+ source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 }
 
 module "detective_usw2" {
- source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+ source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
  providers = { aws = aws.west }
 }
 ```
@@ -429,7 +429,7 @@ provider "aws" { alias = "primary" }
 provider "aws" { alias = "member" }
 
 module "detective_primary" {
-  source    = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source    = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
   providers = { aws = aws.primary }
 
   members = {
@@ -438,7 +438,7 @@ module "detective_primary" {
 }
 
 module "detective_member" {
-  source    = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source    = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
   providers = { aws = aws.member }
 
   create_graph      = false
@@ -472,12 +472,12 @@ output "delegated_admins" {
 ```hcl
 # 1. Threat detection first — GuardDuty is Detective's primary evidence source.
 module "guardduty" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-guardduty?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-guardduty?ref=v1.0.0"
 }
 
 # 2. Register the org's Detective delegated administrator (management account).
 module "detective_admin" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
 
   create_graph                      = false
   enable_organization_admin_account = true
@@ -492,7 +492,7 @@ provider "aws" {
 }
 
 module "detective" {
-  source    = "git::https://github.com/microsoftexpert/tf-mod-aws-detective?ref=v1.0.0"
+  source    = "git::https://github.com/microsoftexpert/terraform-aws-detective?ref=v1.0.0"
   providers = { aws = aws.delegated_admin }
 
   organization_configuration = { auto_enable = true }
@@ -570,8 +570,8 @@ Secure-by-default posture and every opt-out, explicitly:
 | Tagging | `var.tags` applied to the graph by default | n/a — Detective has no encryption/public-access toggle to opt out of; the graph is always tagged when created |
 
 Other principles:
-- **One composite, one keystone — made toggleable.** The graph is the keystone, but it is rendered behind a guarded `for_each` (`create_graph`) so the same module also serves a member account's accepter-only invocation, mirroring `tf-mod-aws-inspector2`'s individually-toggleable-switches philosophy.
-- **GuardDuty and AWS Organizations are deliberately out of scope.** Detective consumes GuardDuty's findings at the data-plane level (not via Terraform wiring) and accepts raw account-id strings for organization inputs rather than depending on the not-yet-authored `tf-mod-aws-organizations` Phase-7 dependency chain.
+- **One composite, one keystone — made toggleable.** The graph is the keystone, but it is rendered behind a guarded `for_each` (`create_graph`) so the same module also serves a member account's accepter-only invocation, mirroring `terraform-aws-inspector2`'s individually-toggleable-switches philosophy.
+- **GuardDuty and AWS Organizations are deliberately out of scope.** Detective consumes GuardDuty's findings at the data-plane level (not via Terraform wiring) and accepts raw account-id strings for organization inputs rather than depending on the not-yet-authored `terraform-aws-organizations` Phase-7 dependency chain.
 - **`for_each`, never `count`,** for the members collection — keyed by stable caller strings so reorders don't churn the plan.
 - **Primary outputs `id` + `arn`** (plus the `effective_graph_arn` non-null convenience alias) and per-member id/status maps.
 
@@ -640,7 +640,7 @@ member_statuses = {
 - [Managing multiple accounts in Detective (Organizations)](https://docs.aws.amazon.com/detective/latest/adminguide/accounts-orgs-transition.html)
 - [Detective and GuardDuty](https://docs.aws.amazon.com/detective/latest/adminguide/detective-guardduty.html)
 - Terraform: [`aws_detective_graph`](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/detective_graph) · [`aws_detective_member`](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/detective_member) · [`aws_detective_invitation_accepter`](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/detective_invitation_accepter) · [`aws_detective_organization_admin_account`](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/detective_organization_admin_account) · [`aws_detective_organization_configuration`](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/detective_organization_configuration)
-- Sibling modules: `tf-mod-aws-guardduty`, `tf-mod-aws-security-hub`, `tf-mod-aws-organizations`, `tf-mod-aws-eventbridge`
+- Sibling modules: `terraform-aws-guardduty`, `terraform-aws-security-hub`, `terraform-aws-organizations`, `terraform-aws-eventbridge`
 - Module internals: `SCOPE.md`
 
 ---

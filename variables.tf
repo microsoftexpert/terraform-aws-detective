@@ -12,7 +12,7 @@
 # account, organization configuration, and invitation accepter are optional
 # single objects/toggles guarded via for_each keyed "this" — the modern
 # "conditionally-created singleton" pattern already used by
-# tf-mod-aws-inspector2 and tf-mod-aws-security-hub in this library.
+# terraform-aws-inspector2 and terraform-aws-security-hub in this library.
 #
 # Secure-by-default: none of the Detective resources expose an
 # encryption/public-access/logging toggle (Detective is itself a
@@ -128,7 +128,7 @@ Detective delegated administrator (aws_detective_organization_admin_account).
 
 Defaults to false. Apply this from the Organizations MANAGEMENT (primary)
 account only — this mirrors the delegated-administrator pattern used
-identically by tf-mod-aws-guardduty and tf-mod-aws-security-hub for their
+identically by terraform-aws-guardduty and terraform-aws-security-hub for their
 respective services. An Organization has exactly one Detective delegated
 administrator per Region.
 EOT
@@ -244,7 +244,7 @@ and documentation, v6.54.0) — every create/update/delete on this service uses
 the provider's fixed internal defaults. This variable is therefore accepted
 but NOT wired to any resource in main.tf; it is retained so a future provider
 version that adds timeouts support can be picked up without an interface
-change, matching the precedent set by tf-mod-aws-security-hub's tags caveat
+change, matching the precedent set by terraform-aws-security-hub's tags caveat
 for a similarly all-or-nothing provider-schema gap.
 EOT
  type = object({

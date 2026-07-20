@@ -58,7 +58,7 @@ resource "aws_detective_organization_configuration" "this" {
  # The delegated administrator must be registered before the org policy is
  # applied. No attribute reference links them (they typically run from
  # different accounts), so encode the ordering explicitly for the single-call
- # case where both are created here — mirrors tf-mod-aws-inspector2.
+ # case where both are created here — mirrors terraform-aws-inspector2.
  depends_on = [aws_detective_organization_admin_account.this]
 }
 
